@@ -14,8 +14,9 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         .tab-active { border-bottom: 2px solid #6366f1; color: #818cf8; }
-        [color-scheme="dark"] { color-scheme: dark; }
-        .project-card:hover { transform: translateY(-4px); }
+        .project-card:hover { transform: translateY(-4px); border-color: rgba(139, 92, 246, 0.5); }
+        .loading-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen">
@@ -33,6 +34,10 @@
             </div>
             
             <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700">
+                    <div class="w-2 h-2 rounded-full bg-amber-500 animate-pulse" id="statusDot"></div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400" id="statusText">Connecting</span>
+                </div>
                 <i data-lucide="user" class="w-5 h-5 text-slate-400"></i>
                 <input type="text" id="devNameInput" placeholder="Nama Dev Kamu" 
                        class="bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-48 transition-all">
@@ -59,8 +64,11 @@
                     <i data-lucide="plus" class="w-4 h-4"></i> Tambah Jadwal
                 </button>
             </div>
-            <div id="calendarContainer" class="space-y-10">
-                <div class="py-20 text-center text-slate-500 italic">Menghubungkan ke server cloud...</div>
+            <div id="calendarContainer" class="grid grid-cols-1 gap-8">
+                <div class="flex flex-col items-center justify-center py-20 text-slate-500" id="calInitialLoader">
+                    <i data-lucide="loader-2" class="w-8 h-8 loading-spin mb-2"></i>
+                    <p class="italic">Menunggu sinkronisasi cloud...</p>
+                </div>
             </div>
         </div>
 
@@ -78,7 +86,7 @@
         </div>
     </main>
 
-    <!-- Modal Form Tambah Jadwal -->
+    <!-- Modals -->
     <div id="scheduleModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div class="flex justify-between items-center p-4 border-b border-slate-800">
@@ -119,7 +127,6 @@
         </div>
     </div>
 
-    <!-- Modal Buat Project Game Baru -->
     <div id="projectCreateModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div class="flex justify-between items-center p-4 border-b border-slate-800">
@@ -136,9 +143,7 @@
         </div>
     </div>
 
-    <!-- Modal Detail Project (Wadah Catatan) -->
     <div id="projectDetailModal" class="fixed inset-0 bg-slate-950 z-50 hidden flex flex-col">
-        <!-- Detail Header -->
         <div class="border-b border-slate-800 bg-slate-900 px-6 py-4 flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <button onclick="closeModal('projectDetailModal')" class="p-2 hover:bg-slate-800 rounded-lg transition-colors">
@@ -158,32 +163,29 @@
                 <i data-lucide="plus-circle" class="w-4 h-4"></i> Tambah Catatan / Progress
             </button>
         </div>
-
-        <!-- Detail Content -->
-        <div class="flex-grow overflow-y-auto p-6">
+        <div class="flex-grow overflow-y-auto p-6 bg-[radial-gradient(circle_at_top,rgba(30,41,59,0.5)_0%,rgba(15,23,42,1)_100%)]">
             <div id="projectNotesContainer" class="max-w-4xl mx-auto space-y-6">
-                <!-- Sub-notes go here -->
+                <!-- Sub-notes -->
             </div>
         </div>
     </div>
 
-    <!-- Modal Tambah Note ke dalam Project -->
     <div id="addNoteModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
             <div class="flex justify-between items-center p-4 border-b border-slate-800">
-                <h3 class="text-lg font-bold text-slate-100 uppercase tracking-tight">Update Proyek</h3>
+                <h3 class="text-lg font-bold text-slate-100 italic uppercase tracking-tight">Tambah Update Progress</h3>
                 <button onclick="closeModal('addNoteModal')"><i data-lucide="x" class="w-5 h-5 text-slate-400 hover:text-white"></i></button>
             </div>
             <form id="addNoteForm" class="p-4 space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Subyek / Topik</label>
-                    <input type="text" id="noteSubject" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-slate-200" placeholder="Contoh: Update Mekanik Lompat">
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Judul Catatan</label>
+                    <input type="text" id="noteSubject" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-slate-200" placeholder="Misal: Desain Level 1">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Detail Progress / Catatan</label>
-                    <textarea id="noteContent" required rows="6" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-slate-200 resize-none" placeholder="Tulis progress atau ide di sini..."></textarea>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Isi Detail</label>
+                    <textarea id="noteContent" required rows="6" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-slate-200 resize-none" placeholder="Jelaskan progress atau idemu..."></textarea>
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors">Posting Update</button>
+                <button type="submit" class="w-full bg-indigo-600 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/20">Simpan Update</button>
             </form>
         </div>
     </div>
@@ -191,97 +193,139 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "" };
+        const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dev-planner-01';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app';
 
         let currentUser = null;
         let activeProjectId = null;
         let devName = localStorage.getItem('devName') || 'Developer';
-        
-        let allSchedules = [];
-        let allProjects = [];
-        let projectNotes = [];
+
+        const updateStatus = (status) => {
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+            if(status === 'connected') {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]";
+                txt.innerText = "Online";
+                txt.className = "text-[10px] font-bold uppercase tracking-widest text-emerald-400";
+            } else if(status === 'error') {
+                dot.className = "w-2 h-2 rounded-full bg-red-500";
+                txt.innerText = "Error";
+                txt.className = "text-[10px] font-bold uppercase tracking-widest text-red-400";
+            }
+        };
 
         const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Auth failed", e);
+                updateStatus('error');
             }
         };
 
         window.onload = () => {
-            lucide.createIcons();
             document.getElementById('devNameInput').value = devName;
             initAuth();
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUser = user;
-                    setupSync(); 
+                    updateStatus('connected');
+                    setupSync();
                 }
             });
+            lucide.createIcons();
         };
 
         function setupSync() {
             if (!currentUser) return;
-            const schCol = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
-            const projCol = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
+            
+            // Sync Schedules
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'schedules'), (snap) => {
+                const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderCalendar(data);
+            }, (err) => {
+                console.error(err);
+                updateStatus('error');
+            });
 
-            onSnapshot(schCol, (snapshot) => {
-                allSchedules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderCalendar();
-            }, (e) => console.error(e));
-
-            onSnapshot(projCol, (snapshot) => {
-                allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderProjects();
-            }, (e) => console.error(e));
+            // Sync Projects
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), (snap) => {
+                const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderProjects(data);
+            });
         }
 
-        function renderCalendar() {
+        function renderCalendar(data) {
             const container = document.getElementById('calendarContainer');
             if (!container) return;
             container.innerHTML = '';
             const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-            const devGroups = { [devName]: days.reduce((a,v) => ({...a, [v]:[]}), {}) };
             
-            allSchedules.forEach(s => {
-                if (!devGroups[s.devName]) devGroups[s.devName] = days.reduce((a,v) => ({...a, [v]:[]}), {});
-                devGroups[s.devName][s.day].push(s);
-            });
+            const devs = [...new Set(data.map(s => s.devName))];
+            if (devs.length === 0 && data.length === 0) {
+                container.innerHTML = `<div class="py-10 text-center text-slate-600 italic">Belum ada jadwal. Tambahkan jadwal pertamamu!</div>`;
+                return;
+            }
 
-            Object.entries(devGroups).forEach(([name, week]) => {
-                const div = document.createElement('div');
-                div.className = "bg-slate-900/50 p-6 rounded-2xl border border-slate-800";
-                div.innerHTML = `<h3 class="font-bold text-lg mb-4 text-indigo-400">Dev: ${name}</h3>
-                <div class="grid grid-cols-1 md:grid-cols-7 gap-4">${days.map(d => `
-                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2 min-h-[100px]">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase mb-2">${d}</p>
-                        ${week[d].map(s => `<div class="bg-slate-800 p-2 rounded text-[11px] mb-1 border-l-2 border-indigo-500">${s.title}<br/><span class="text-slate-500">${s.startTime}</span></div>`).join('')}
+            // Ensure current dev exists in list even if no schedule yet
+            if(!devs.includes(devName)) devs.push(devName);
+
+            devs.sort().forEach(dName => {
+                const devRow = document.createElement('div');
+                devRow.className = "bg-slate-900/50 rounded-2xl border border-slate-800 p-6 mb-6";
+                devRow.innerHTML = `
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">${dName[0]}</div>
+                        <h3 class="font-bold text-slate-200">${dName}</h3>
                     </div>
-                `).join('')}</div>`;
-                container.appendChild(div);
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-3">
+                        ${days.map(day => {
+                            const items = data.filter(s => s.devName === dName && s.day === day);
+                            return `
+                                <div class="bg-slate-900 border border-slate-800 rounded-xl p-2 min-h-[80px]">
+                                    <p class="text-[9px] font-bold text-slate-500 uppercase mb-2">${day}</p>
+                                    ${items.map(i => `
+                                        <div class="bg-slate-800 p-2 rounded-lg text-[10px] border-l-2 border-indigo-500 mb-1 group relative">
+                                            <div class="font-bold text-slate-300">${i.title}</div>
+                                            <div class="text-slate-500">${i.startTime} - ${i.endTime}</div>
+                                            ${i.userId === currentUser.uid ? `<button onclick="window.deleteSch('${i.id}')" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                container.appendChild(devRow);
             });
             lucide.createIcons();
         }
 
-        function renderProjects() {
+        function renderProjects(data) {
             const grid = document.getElementById('projectsGrid');
             grid.innerHTML = '';
-            allProjects.forEach(p => {
+            if (data.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-10 text-center text-slate-600 italic">Belum ada proyek game. Klik tombol "Buat Game Baru".</div>`;
+            }
+            data.forEach(p => {
                 const card = document.createElement('div');
-                card.className = "project-card bg-slate-900 border border-slate-800 rounded-2xl p-6 cursor-pointer hover:border-purple-500/50 transition-all flex flex-col items-center justify-center text-center space-y-4 group relative";
+                card.className = "project-card bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all group relative";
                 card.innerHTML = `
-                    <div class="w-16 h-16 bg-purple-500/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-500/20">
-                        <i data-lucide="gamepad-2" class="text-purple-500 w-8 h-8"></i>
+                    <div class="w-20 h-20 bg-purple-500/10 rounded-3xl flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-all">
+                        <i data-lucide="gamepad-2" class="text-purple-500 w-10 h-10"></i>
                     </div>
-                    <h4 class="text-lg font-bold text-white group-hover:text-purple-400 transition-colors">${p.name}</h4>
-                    <button onclick="event.stopPropagation(); window.deleteProject('${p.id}')" class="absolute top-2 right-2 p-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <h4 class="text-xl font-bold text-white uppercase tracking-tight">${p.name}</h4>
+                    <p class="text-[10px] text-slate-500 mt-2 font-bold tracking-widest">BUKA DASHBOARD</p>
+                    <button onclick="event.stopPropagation(); window.deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 text-slate-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 `;
@@ -291,97 +335,90 @@
             lucide.createIcons();
         }
 
-        window.openProject = (project) => {
-            activeProjectId = project.id;
-            document.getElementById('currentProjectTitle').innerText = project.name;
+        window.openProject = (p) => {
+            activeProjectId = p.id;
+            document.getElementById('currentProjectTitle').innerText = p.name;
             openModal('projectDetailModal');
-            syncProjectNotes();
+            syncNotes();
         };
 
-        function syncProjectNotes() {
+        function syncNotes() {
             if (!activeProjectId) return;
-            const notesCol = collection(db, 'artifacts', appId, 'public', 'data', 'project_notes');
-            // We fetch all and filter in memory to comply with Rule 2 (No complex queries)
-            onSnapshot(notesCol, (snapshot) => {
-                const notes = snapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'project_notes'), (snap) => {
+                const notes = snap.docs
+                    .map(d => ({id: d.id, ...d.data()}))
                     .filter(n => n.projectId === activeProjectId)
                     .sort((a,b) => b.createdAt - a.createdAt);
-                
-                renderProjectNotes(notes);
+                renderNotes(notes);
             });
         }
 
-        function renderProjectNotes(notes) {
+        function renderNotes(notes) {
             const container = document.getElementById('projectNotesContainer');
-            container.innerHTML = notes.length === 0 ? 
-                `<div class="text-center py-20 text-slate-600 italic">Belum ada catatan. Mulai dengan klik "Tambah Catatan" di atas!</div>` : '';
-            
+            container.innerHTML = notes.length === 0 ? `<div class="text-center py-20 text-slate-700 italic">Belum ada catatan untuk proyek ini.</div>` : '';
             notes.forEach(n => {
-                const item = document.createElement('div');
-                item.className = "bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg";
-                item.innerHTML = `
-                    <div class="p-6">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h5 class="text-lg font-bold text-indigo-400">${n.subject}</h5>
-                                <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">Oleh: ${n.devName} • ${new Date(n.createdAt).toLocaleString('id-ID')}</p>
-                            </div>
-                            ${n.userId === currentUser.uid ? `<button onclick="window.deleteSubNote('${n.id}')" class="text-slate-600 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                const card = document.createElement('div');
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h5 class="text-lg font-bold text-indigo-400">${n.subject}</h5>
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Oleh: ${n.devName} • ${new Date(n.createdAt).toLocaleString()}</p>
                         </div>
-                        <div class="text-slate-300 whitespace-pre-wrap leading-relaxed">${n.content}</div>
+                        ${n.userId === currentUser.uid ? `<button onclick="window.deleteNote('${n.id}')" class="text-slate-700 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
                     </div>
+                    <div class="text-slate-300 leading-relaxed whitespace-pre-wrap">${n.content}</div>
                 `;
-                container.appendChild(item);
+                container.appendChild(card);
             });
             lucide.createIcons();
         }
 
-        // --- Event Listeners ---
+        // --- Actions ---
         document.getElementById('projectCreateForm').onsubmit = async (e) => {
             e.preventDefault();
             const name = document.getElementById('projName').value;
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), { name, createdAt: Date.now() });
-            closeModal('projectCreateModal');
-            e.target.reset();
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), { name, createdAt: Date.now(), userId: currentUser.uid });
+                closeModal('projectCreateModal');
+                e.target.reset();
+            } catch(err) { console.error(err); }
         };
 
         document.getElementById('addNoteForm').onsubmit = async (e) => {
             e.preventDefault();
             if (!activeProjectId) return;
-            const data = {
-                projectId: activeProjectId,
-                subject: document.getElementById('noteSubject').value,
-                content: document.getElementById('noteContent').value,
-                devName, userId: currentUser.uid, createdAt: Date.now()
-            };
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'project_notes'), data);
-            closeModal('addNoteModal');
-            e.target.reset();
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'project_notes'), {
+                    projectId: activeProjectId,
+                    subject: document.getElementById('noteSubject').value,
+                    content: document.getElementById('noteContent').value,
+                    devName, userId: currentUser.uid, createdAt: Date.now()
+                });
+                closeModal('addNoteModal');
+                e.target.reset();
+            } catch(err) { console.error(err); }
         };
 
         document.getElementById('scheduleForm').onsubmit = async (e) => {
             e.preventDefault();
-            const data = {
-                title: document.getElementById('schTitle').value,
-                day: document.getElementById('schDay').value,
-                type: document.getElementById('schType').value,
-                startTime: document.getElementById('schStartTime').value,
-                endTime: document.getElementById('schEndTime').value,
-                devName, userId: currentUser.uid, createdAt: Date.now()
-            };
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'schedules'), data);
-            closeModal('scheduleModal');
-            e.target.reset();
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'schedules'), {
+                    title: document.getElementById('schTitle').value,
+                    day: document.getElementById('schDay').value,
+                    type: document.getElementById('schType').value,
+                    startTime: document.getElementById('schStartTime').value,
+                    endTime: document.getElementById('schEndTime').value,
+                    devName, userId: currentUser.uid, createdAt: Date.now()
+                });
+                closeModal('scheduleModal');
+                e.target.reset();
+            } catch(err) { console.error(err); }
         };
 
-        window.deleteProject = async (id) => {
-            if(confirm("Hapus seluruh proyek ini?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', id));
-        };
-
-        window.deleteSubNote = async (id) => {
-            if(confirm("Hapus catatan ini?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'project_notes', id));
-        };
+        window.deleteProject = async (id) => { if(confirm("Hapus proyek ini?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', id)); };
+        window.deleteSch = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'schedules', id)); };
+        window.deleteNote = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'project_notes', id)); };
 
         window.switchTab = (t) => {
             document.getElementById('section-calendar').classList.toggle('hidden', t !== 'calendar');
@@ -395,7 +432,6 @@
         document.getElementById('devNameInput').onchange = (e) => {
             devName = e.target.value;
             localStorage.setItem('devName', devName);
-            renderCalendar();
         };
     </script>
 </body>
